@@ -1,0 +1,434 @@
+node n1 {
+    type router
+    model host
+    network-config {
+	hostname n1Host
+	!
+	interface eth0
+	!
+    }
+    canvas c1
+    iconcoords {170.0 259.0}
+    labelcoords {170.0 291.0}
+    interface-peer {eth0 n4}
+    services {UserDefined}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/var/run/rdnssd', '/var/run/resolvconf', '/etc/resolvconf', )
+	files=('dns.sh', )
+	cmdup=('bash dns.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:dns.sh
+	custom-command dns.sh
+	config {
+	#!/bin/bash
+	mkdir -p /var/run/resolvconf/interface
+	mkdir -p /etc/resolvconf/update.d
+	mkdir -p /etc/resolvconf/update-libc.d
+	mkdir -p /etc/resolvconf/resolv.conf.d
+	[ -f "/etc/resolvconf/resolv.conf.d/base" ] && rm -rf "/etc/resolvconf/resolv.conf.d/base"
+	touch /etc/resolvconf/resolv.conf.d/base
+	[ -L "/etc/resolvconf/resolv.conf.d/head" ] && unlink "/etc/resolvconf/resolv.conf.d/head"
+	ln -s base /etc/resolvconf/resolv.conf.d/head
+	[ -f "/etc/resolvconf/interface-order" ] && rm -rf "/etc/resolvconf/interface-order"
+	touch /etc/resolvconf/interface-order
+	echo '# interface-order(5)' >> /etc/resolvconf/interface-order
+	echo 'lo.inet*' >> /etc/resolvconf/interface-order
+	echo 'lo.dnsmasq' >> /etc/resolvconf/interface-order
+	echo 'lo.pdnsd' >> /etc/resolvconf/interface-order
+	echo 'lo.!(pdns|pdns-recursor)' >> /etc/resolvconf/interface-order
+	echo 'lo' >> /etc/resolvconf/interface-order
+	echo 'tun*' >> /etc/resolvconf/interface-order
+	echo 'tap*' >> /etc/resolvconf/interface-order
+	echo 'hso*' >> /etc/resolvconf/interface-order
+	echo 'em+([0-9])?(_+([0-9]))*' >> /etc/resolvconf/interface-order
+	echo 'p+([0-9])p+([0-9])?(_+([0-9]))*' >> /etc/resolvconf/interface-order
+	echo 'eth*' >> /etc/resolvconf/interface-order
+	echo 'ath*' >> /etc/resolvconf/interface-order
+	echo 'wlan*' >> /etc/resolvconf/interface-order
+	echo 'ppp*' >> /etc/resolvconf/interface-order
+	echo '*' >> /etc/resolvconf/interface-order
+	[ -f "/etc/resolvconf/update.d/libc" ] && rm -rf "/etc/resolvconf/update.d/libc"
+	touch /etc/resolvconf/update.d/libc
+	chmod 755 /etc/resolvconf/update.d/libc
+	echo '#!/bin/sh' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo '# Script to update resolv.conf, the libc resolver configuration file,' >> /etc/resolvconf/update.d/libc
+	echo '# and to notify users of the libc resolver of changes' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo '# Assumption: On entry, PWD contains the resolv.conf-type files.' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo '# This script is part of the resolvconf package.' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo '# Set REPORT_ABSENT_SYMLINK=no to inhibit warning message that' >> /etc/resolvconf/update.d/libc
+	echo '# /etc/resolv.conf is not a symbolic link' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo '# Set TRUNCATE_NAMESERVER_LIST_AFTER_LOOPBACK_ADDRESS=no' >> /etc/resolvconf/update.d/libc
+	echo '# to allow additional nameserver addresses to be listed in' >> /etc/resolvconf/update.d/libc
+	echo '# resolv.conf after an initial loopback address 127.* or ::1.' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'set -e' >> /etc/resolvconf/update.d/libc
+	echo 'PATH=/sbin:/bin' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '[ -x /lib/resolvconf/list-records ] || exit 1' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# Default override' >> /etc/resolvconf/update.d/libc
+	echo '[ -r /etc/default/resolvconf ] && . /etc/default/resolvconf' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'ETC=/etc' >> /etc/resolvconf/update.d/libc
+	echo 'ETCRESOLVCONF="${ETC}/resolvconf"' >> /etc/resolvconf/update.d/libc
+	echo 'RESOLVCONFDIR="${ETCRESOLVCONF}/resolv.conf.d"' >> /etc/resolvconf/update.d/libc
+	echo 'BASEFILE="${RESOLVCONFDIR}/base"' >> /etc/resolvconf/update.d/libc
+	echo 'HEADFILE="${RESOLVCONFDIR}/head"' >> /etc/resolvconf/update.d/libc
+	echo 'TAILFILE="${RESOLVCONFDIR}/tail"' >> /etc/resolvconf/update.d/libc
+	echo 'DYNAMICRSLVCNFFILE="/run/resolvconf/resolv.conf"' >> /etc/resolvconf/update.d/libc
+	echo 'TMPFILE="${DYNAMICRSLVCNFFILE}_new.$$"' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# Set unset variables to their defaults' >> /etc/resolvconf/update.d/libc
+	echo 'if [ -z "$REPORT_ABSENT_SYMLINK" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo '# '\''..._ALTERED_...'\'' is the old deprecated name for this variable' >> /etc/resolvconf/update.d/libc
+	echo 'if [ "$REPORT_ALTERED_SYMLINK" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo 'REPORT_ABSENT_SYMLINK="$REPORT_ALTERED_SYMLINK"' >> /etc/resolvconf/update.d/libc
+	echo 'else' >> /etc/resolvconf/update.d/libc
+	echo '# Set to default value' >> /etc/resolvconf/update.d/libc
+	echo 'REPORT_ABSENT_SYMLINK=y' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'if [ -z "$TRUNCATE_NAMESERVER_LIST_AFTER_LOOPBACK_ADDRESS" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo '# '\''..._127'\'' is the old deprecated name for this variable' >> /etc/resolvconf/update.d/libc
+	echo 'if [ "$TRUNCATE_NAMESERVER_LIST_AFTER_127" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo 'TRUNCATE_NAMESERVER_LIST_AFTER_LOOPBACK_ADDRESS="$TRUNCATE_NAMESERVER_LIST_AFTER_127"' >> /etc/resolvconf/update.d/libc
+	echo 'else' >> /etc/resolvconf/update.d/libc
+	echo '# Set to default value' >> /etc/resolvconf/update.d/libc
+	echo 'TRUNCATE_NAMESERVER_LIST_AFTER_LOOPBACK_ADDRESS=y' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'report_warning() { echo "$0: Warning: $*" >&2 ; }' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'if [ ! -L ${ETC}/resolv.conf ] || [ ! "$(readlink -m ${ETC}/resolv.conf)" = "$DYNAMICRSLVCNFFILE" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo 'case "$REPORT_ABSENT_SYMLINK" in' >> /etc/resolvconf/update.d/libc
+	echo 'y|Y|yes|YES|Yes)' >> /etc/resolvconf/update.d/libc
+	echo 'report_warning "${ETC}/resolv.conf is not a symbolic link to $DYNAMICRSLVCNFFILE"' >> /etc/resolvconf/update.d/libc
+	echo ';;' >> /etc/resolvconf/update.d/libc
+	echo 'esac' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# Args are candidate items not containing spaces' >> /etc/resolvconf/update.d/libc
+	echo '# Returns RSLT -- space-separated list of items without duplicates' >> /etc/resolvconf/update.d/libc
+	echo '#' >> /etc/resolvconf/update.d/libc
+	echo '# Stores arguments (minus duplicates) in RSLT, separated by spaces' >> /etc/resolvconf/update.d/libc
+	echo 'uniquify()' >> /etc/resolvconf/update.d/libc
+	echo '{' >> /etc/resolvconf/update.d/libc
+	echo 'RSLT=""' >> /etc/resolvconf/update.d/libc
+	echo 'local D' >> /etc/resolvconf/update.d/libc
+	echo 'while [ "$1" ] ; do' >> /etc/resolvconf/update.d/libc
+	echo '# Remove the root domain suffix' >> /etc/resolvconf/update.d/libc
+	echo 'D="${1%.}"' >> /etc/resolvconf/update.d/libc
+	echo 'for E in $RSLT ; do' >> /etc/resolvconf/update.d/libc
+	echo '[ "$D" = "$E" ] && { shift ; continue 2 ; }' >> /etc/resolvconf/update.d/libc
+	echo 'done' >> /etc/resolvconf/update.d/libc
+	echo 'RSLT="${RSLT:+$RSLT }$D"' >> /etc/resolvconf/update.d/libc
+	echo 'shift' >> /etc/resolvconf/update.d/libc
+	echo 'done' >> /etc/resolvconf/update.d/libc
+	echo '}' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# Args are candidate items not containing spaces' >> /etc/resolvconf/update.d/libc
+	echo '# Returns NSMSRVS -- space-separate list of no more than 3 items,' >> /etc/resolvconf/update.d/libc
+	echo '#                    without duplicates,' >> /etc/resolvconf/update.d/libc
+	echo '#                    truncated after loopback address if TRUNCATE_NAMESERVER_LIST_AFTER_LOOPBACK_ADDRESS set affirmatively' >> /etc/resolvconf/update.d/libc
+	echo 'uniquify_nameserver_list()' >> /etc/resolvconf/update.d/libc
+	echo '{' >> /etc/resolvconf/update.d/libc
+	echo 'NMSRVRS=""' >> /etc/resolvconf/update.d/libc
+	echo 'N=0' >> /etc/resolvconf/update.d/libc
+	echo 'while [ "$1" ] ; do' >> /etc/resolvconf/update.d/libc
+	echo 'for E in $NMSRVRS ; do' >> /etc/resolvconf/update.d/libc
+	echo '[ "$1" = "$E" ] && { shift ; continue 2 ; }' >> /etc/resolvconf/update.d/libc
+	echo 'done' >> /etc/resolvconf/update.d/libc
+	echo 'NMSRVRS="${NMSRVRS:+$NMSRVRS }$1"' >> /etc/resolvconf/update.d/libc
+	echo 'case "$TRUNCATE_NAMESERVER_LIST_AFTER_LOOPBACK_ADDRESS" in (y|Y|yes|YES|Yes) case "$1" in (127.*|::1) return 0 ;; esac ;; esac' >> /etc/resolvconf/update.d/libc
+	echo 'N=$(($N + 1))' >> /etc/resolvconf/update.d/libc
+	echo '[ "$N" = 3 ] && return 0' >> /etc/resolvconf/update.d/libc
+	echo 'shift' >> /etc/resolvconf/update.d/libc
+	echo 'done' >> /etc/resolvconf/update.d/libc
+	echo '}' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'RSLVCNFFILES="$(/lib/resolvconf/list-records)"' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '[ -f "$BASEFILE" ] && RSLVCNFFILES="$RSLVCNFFILES' >> /etc/resolvconf/update.d/libc
+	echo '$BASEFILE"' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '### Compile list of nameservers ###' >> /etc/resolvconf/update.d/libc
+	echo 'NMSRVRS=""' >> /etc/resolvconf/update.d/libc
+	echo 'if [ "$RSLVCNFFILES" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo 'uniquify_nameserver_list $(sed -n '\''s/^[[:space:]]*nameserver[[:space:]]+//p'\'' $RSLVCNFFILES)' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '### Compile search list ###' >> /etc/resolvconf/update.d/libc
+	echo 'SRCHS=""' >> /etc/resolvconf/update.d/libc
+	echo 'if [ "$RSLVCNFFILES" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo 'uniquify $(sed -n '\''s/^[[:space:]]*((search)|(domain))[[:space:]]+//p'\'' $RSLVCNFFILES)' >> /etc/resolvconf/update.d/libc
+	echo 'SRCHS="$RSLT"' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'clean_up() { rm -f "$TMPFILE" ; }' >> /etc/resolvconf/update.d/libc
+	echo 'trap clean_up EXIT' >> /etc/resolvconf/update.d/libc
+	echo 'clean_up' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '### Make the file ###' >> /etc/resolvconf/update.d/libc
+	echo ': > "$TMPFILE"' >> /etc/resolvconf/update.d/libc
+	echo '[ -f "$HEADFILE" ] && cat "$HEADFILE" >> "$TMPFILE"' >> /etc/resolvconf/update.d/libc
+	echo 'for N in $NMSRVRS ; do echo "nameserver $N" >> "$TMPFILE" ; done' >> /etc/resolvconf/update.d/libc
+	echo '[ "$SRCHS" ] && echo "search $SRCHS" >> "$TMPFILE"' >> /etc/resolvconf/update.d/libc
+	echo '[ "$RSLVCNFFILES" ] && sed -e '\''/^[[:space:]]*$/d'\'' -e '\''/^[[:space:]]*#/d'\'' -e '\''/^[[:space:]]*((nameserver)|(search)|(domain))[[:space:]]/d'\'' $RSLVCNFFILES >> "$TMPFILE" 2>/dev/null' >> /etc/resolvconf/update.d/libc
+	echo '[ -f "$TAILFILE" ] && cat "$TAILFILE" >> "$TMPFILE"' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '### Put the file in place ###' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'if [ -f "$DYNAMICRSLVCNFFILE" ] && [ "$(cat $TMPFILE)" = "$(cat $DYNAMICRSLVCNFFILE)" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo '# The file has not changed' >> /etc/resolvconf/update.d/libc
+	echo 'rm -f "$TMPFILE"' >> /etc/resolvconf/update.d/libc
+	echo 'exit 0' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# The file has changed' >> /etc/resolvconf/update.d/libc
+	echo 'mv -f "$TMPFILE" "$DYNAMICRSLVCNFFILE"' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# Restart nscd' >> /etc/resolvconf/update.d/libc
+	echo 'NSCD_RESTARTED=""' >> /etc/resolvconf/update.d/libc
+	echo 'NSCD_PIDFILE=""' >> /etc/resolvconf/update.d/libc
+	echo '[ -s /var/run/nscd.pid ] && NSCD_PIDFILE="/var/run/nscd.pid"' >> /etc/resolvconf/update.d/libc
+	echo '[ -s /var/run/nscd/nscd.pid ] && NSCD_PIDFILE="/var/run/nscd/nscd.pid"' >> /etc/resolvconf/update.d/libc
+	echo 'if 	[ "$NSCD_PIDFILE" ] 	&& [ -x /usr/sbin/nscd ] 	&& [ -x /etc/init.d/nscd ] 	&& [ -s /etc/nscd.conf ] 	&& grep -q '\''[[:space:]]*enable-cache[[:space:]]+hosts[[:space:]]+yes'\'' /etc/nscd.conf 	&& start-stop-daemon --stop --quiet --pidfile="$NSCD_PIDFILE" --exec /usr/sbin/nscd --retry=TERM/3/HUP/5 	&& start-stop-daemon --stop --quiet --oknodo --exec /usr/sbin/nscd --retry=0/5' >> /etc/resolvconf/update.d/libc
+	echo 'then' >> /etc/resolvconf/update.d/libc
+	echo 'echo "Stopped Name Service Cache Daemon: nscd."' >> /etc/resolvconf/update.d/libc
+	echo '/etc/init.d/nscd start && { sleep 0.1 ; NSCD_RESTARTED=yes ; }' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo '# Notify users of the resolver' >> /etc/resolvconf/update.d/libc
+	echo 'if [ -d "${ETCRESOLVCONF}/update-libc.d" ] ; then' >> /etc/resolvconf/update.d/libc
+	echo 'exec run-parts ${NSCD_RESTARTED:+--arg="--nscd"} "${ETCRESOLVCONF}/update-libc.d"' >> /etc/resolvconf/update.d/libc
+	echo 'fi' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	echo 'exit 0' >> /etc/resolvconf/update.d/libc
+	echo >> /etc/resolvconf/update.d/libc
+	resolvconf --create-runtime-directories
+	resolvconf -u
+	resolvconf --enable-updates
+	}
+    }
+}
+
+node n2 {
+    type router
+    model host
+    network-config {
+	hostname n2DNS
+	!
+	interface eth0
+	 ipv6 address 2001:db8::abc/64
+	!
+    }
+    canvas c1
+    iconcoords {409.0 259.0}
+    labelcoords {409.0 291.0}
+    interface-peer {eth0 n4}
+    services {DefaultRoute UserDefined}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/etc/bind', )
+	files=('/etc/bind/rndc.key', '/etc/bind/named.conf', '/etc/bind/bind.keys', '/etc/bind/db.root', '/etc/bind/db.0', '/etc/bind/db.127', '/etc/bind/db.255', '/etc/bind/db.empty', '/etc/bind/db.local', '/etc/bind/named.conf.default-zones', '/etc/bind/named.conf.local', '/etc/bind/named.conf.options', '/etc/bind/zones.rfc1918', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/zones.rfc1918
+	custom-command /etc/bind/zones.rfc1918
+	config {
+	file:///etc/bind/zones.rfc1918
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/named.conf.options
+	custom-command /etc/bind/named.conf.options
+	config {
+	file:///etc/bind/named.conf.options
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/named.conf.local
+	custom-command /etc/bind/named.conf.local
+	config {
+	file:///etc/bind/named.conf.local
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/named.conf.default-zones
+	custom-command /etc/bind/named.conf.default-zones
+	config {
+	file:///etc/bind/named.conf.default-zones
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/db.local
+	custom-command /etc/bind/db.local
+	config {
+	file:///etc/bind/db.local
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/db.empty
+	custom-command /etc/bind/db.empty
+	config {
+	file:///etc/bind/db.empty
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/db.255
+	custom-command /etc/bind/db.255
+	config {
+	file:///etc/bind/db.255
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/db.127
+	custom-command /etc/bind/db.127
+	config {
+	file:///etc/bind/db.127
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/db.0
+	custom-command /etc/bind/db.0
+	config {
+	file:///etc/bind/db.0
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/db.root
+	custom-command /etc/bind/db.root
+	config {
+	file:///etc/bind/db.root
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/bind.keys
+	custom-command /etc/bind/bind.keys
+	config {
+	file:///etc/bind/bind.keys
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/named.conf
+	custom-command /etc/bind/named.conf
+	config {
+	file:///etc/bind/named.conf
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/bind/rndc.key
+	custom-command /etc/bind/rndc.key
+	config {
+	file:///etc/bind/rndc.key
+	}
+    }
+}
+
+node n3 {
+    type router
+    model router
+    network-config {
+	hostname n3Router
+	!
+	interface eth0
+	 ipv6 address 2001:db8::123/64
+	!
+    }
+    canvas c1
+    iconcoords {289.0 116.0}
+    labelcoords {287.0 97.0}
+    interface-peer {eth0 n4}
+    services {zebra IPForward}
+}
+
+node n4 {
+    type lanswitch
+    network-config {
+	hostname switch
+	!
+    }
+    canvas c1
+    iconcoords {290.0 210.0}
+    labelcoords {290.0 234.0}
+    interface-peer {e0 n1}
+    interface-peer {e1 n2}
+    interface-peer {e2 n3}
+}
+
+link l1 {
+    nodes {n1 n4}
+    bandwidth 0
+}
+
+link l2 {
+    nodes {n4 n2}
+    bandwidth 0
+}
+
+link l3 {
+    nodes {n4 n3}
+    bandwidth 0
+}
+
+annotation a1 {
+    iconcoords {97.0 51.0 481.0 359.0}
+    type rectangle
+    label {LAN}
+    labelcolor black
+    fontfamily {Arial}
+    fontsize {12}
+    color #19ffff
+    width 0
+    border black
+    rad 25
+    canvas c1
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+hook 4:runtime_hook.sh {
+#!/bin/sh
+# session hook script; write commands here to execute on the host at the
+# specified state
+test '! -f /etc/resolv.conf' && touch /etc/resolv.conf
+test '! -L /etc/resolv.conf' && rm /etc/resolv.conf 2>> /dev/null && ln -s /var/run/resolvconf/resolv.conf /etc/resolv.conf
+
+
+}
+
+option global {
+    interface_names no
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid no
+    traffic_start 0
+}
+
+option session {
+}
+

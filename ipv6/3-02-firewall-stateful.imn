@@ -1,0 +1,1578 @@
+node n4 {
+    type router
+    model host
+    network-config {
+	hostname n4Host
+	!
+	interface eth0
+	 ipv6 address 2001:db8:1dea::abcd/64
+	!
+    }
+    canvas c1
+    iconcoords {61.0 228.0}
+    labelcoords {60.0 202.0}
+    services {DefaultRoute SSH UserDefined Firewall}
+    custom-config {
+	custom-config-id service:Firewall
+	custom-command Firewall
+	config {
+	files=('firewall.sh', )
+	cmdup=('chmod 755 firewall.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:Firewall:firewall.sh
+	custom-command firewall.sh
+	config {
+	#!/bin/bash
+	
+	PATH=/sbin:/bin:/usr/sbin:/usr/bin
+	
+	IPTABLES=`which ip6tables`
+	
+	GLOBAL='2001:db8:1dea::abcd/128'
+	
+	INTERNET='2000::/3'
+	
+	start() {
+	  ${IPTABLES} -X
+	  ${IPTABLES} -P INPUT DROP
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT DROP
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD DROP
+	  ${IPTABLES} -F FORWARD
+	
+	  for CHAIN in INPUT OUTPUT FORWARD; do
+	    # Disable Routing Header Type 0 [RFC5095]
+	    ${IPTABLES} -A ${CHAIN} -m rt --rt-type 0 -j DROP
+	    # Disable transit for some prefixes
+	    # 6bone         [RFC5156] : 3ffe::/16
+	    # BMWG          [RFC5180] : 2001:2::/48
+	    # ORCHID        [RFC4843] : 2001:10::/28
+	    # Documentation [RFC3849] : 2001:db8::/32
+	    # in real life you need to add doc prefix below
+	    for TARGET in '-s' '-d'; do
+	      for BLOCKED in '3ffe::/16' '2001:2::/48' '2001:10::/28'; do
+	        ${IPTABLES} -A ${CHAIN} ${TARGET} ${BLOCKED} -j DROP
+	      done
+	    done
+	  done
+	
+	  # Accept All Nodes link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1 -j ACCEPT
+	
+	  # Accept Solicited Node link-local scope
+	  # multicast prefix [RFC4291]
+	  ## Modify the line below -- 1 of 3 ##
+	  ${IPTABLES} -A INPUT -d ff02::1:ff00:0000/104 -j DROP
+	
+	  # Accept local scope ICMPv6 packets from
+	  # link-local prefix [RFC4890]
+	  for IP in 'fe80::/64'; do
+	    # Destination Unreachable [All codes] (Type 1)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                destination-unreachable -d ${IP} -j ACCEPT
+	    # Packet Too Big (Type 2)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                packet-too-big -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 0] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                ttl-zero-during-transit -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 1] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                ttl-zero-during-reassembly -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 0] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                bad-header -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 1] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                unknown-header-type -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 2] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                unknown-option -d ${IP} -j ACCEPT
+	
+	    # Echo Request (Type 128)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                echo-request -d ${IP} -j ACCEPT
+	    # Echo Response (Type 129)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                echo-reply -d ${IP} -j ACCEPT
+	
+	    # Router Solicitation (Type 133)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 \
+	                -d ${IP} -j ACCEPT
+	    # Router Advertisement (Type 134)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 \
+	                -d ${IP} -j ACCEPT
+	    # Neighbor Solicitation (Type 135)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 \
+	                -d ${IP} -j ACCEPT
+	    # Neighbor Advertisement (Type 136)
+	    ## Modify the line below -- 2 of 3 ##
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 \
+	                -d ${IP} -j DROP
+	    # Inverse Neighbor Discovery Solicitation (Type 141)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 \
+	                -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Advertisement (Type 142)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 \
+	                -d ${IP} -j ACCEPT
+	
+	    # Listener Query (Type 130)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 \
+	                -d ${IP} -j ACCEPT
+	    # Listener Report (Type 131)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 \
+	                -d ${IP} -j ACCEPT
+	    # Listener Done (Type 132)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 \
+	                -d ${IP} -j ACCEPT
+	    # Listener Report v2 (Type 143)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 \
+	                -d ${IP} -j ACCEPT
+	
+	    # Certification Path Solicitation (Type 148)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 \
+	                -d ${IP} -j ACCEPT
+	    # Certification Path Advertisement (Type 149)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 \
+	                -d ${IP} -j ACCEPT
+	
+	    # Multicast Router Advertisement (Type 151)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 \
+	                -d ${IP} -j ACCEPT
+	    # Multicast Router Solicitation (Type 152)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 \
+	                -d ${IP} -j ACCEPT
+	    # Multicast Router Termination (Type 153)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 \
+	                -d ${IP} -j ACCEPT
+	  done
+	
+	  for IP in ${GLOBAL}; do
+	    for ALLOCATED in ${INTERNET}; do
+	      # Accept routable ICMPv6 packets from
+	      # allocated prefixes [RFC4890]
+	      # Destination Unreachable [All codes] (Type 1)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  destination-unreachable -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Packet Too Big (Type 2)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  packet-too-big -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 0] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  ttl-zero-during-transit -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 1] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  ttl-zero-during-reassembly -s ${ALLOCATED} \
+	                   -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 0] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  bad-header -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 1] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  unknown-header-type -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 2] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  unknown-option -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Echo Request (Type 128)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  echo-request -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Echo Response (Type 129)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  echo-reply -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Router Solicitation (Type 133)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 \
+	                  -d ${IP} -j ACCEPT
+	      # Router Advertisement (Type 134)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 \
+	                  -d ${IP} -j ACCEPT
+	      # Neighbor Solicitation (Type 135)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 \
+	                  -d ${IP} -j ACCEPT
+	      # Neighbor Advertisement (Type 136)
+	      ## Modify the line below -- 3 of 3 ##
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 \
+	                  -d ${IP} -j DROP
+	      # Inverse Neighbor Discovery Solicitation (Type 141)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 \
+	                  -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Advertisement (Type 142)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Listener Query (Type 130)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 \
+	                  -d ${IP} -j ACCEPT
+	      # Listener Report (Type 131)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 \
+	                  -d ${IP} -j ACCEPT
+	      # Listener Done (Type 132)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 \
+	                  -d ${IP} -j ACCEPT
+	      # Listener Report v2 (Type 143)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Certification Path Solicitation (Type 148)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 \
+	                  -d ${IP} -j ACCEPT
+	      # Certification Path Advertisement (Type 149)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Multicast Router Advertisement (Type 151)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 \
+	                  -d ${IP} -j ACCEPT
+	      # Multicast Router Solicitation (Type 152)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 \
+	                  -d ${IP} -j ACCEPT
+	      # Multicast Router Termination (Type 153)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # traceroute
+	      ${IPTABLES} -A INPUT -p udp -m udp -s ${ALLOCATED} \
+	                  -d ${IP} --dport 33434:33523 -m state \
+	                  --state NEW -j REJECT --reject-with \
+	                  icmp6-port-unreachable
+	      # ssh
+	      ${IPTABLES} -A INPUT -p tcp -s ${ALLOCATED} \
+	                  -d ${IP} --dport 22 -j ACCEPT
+	      # http
+	      ${IPTABLES} -A INPUT -p tcp -s ${ALLOCATED} \
+	                  -d ${IP} --dport 80 -j ACCEPT
+	
+	    done
+	  done
+	
+	  # Accept incoming packets from allocated prefixes and
+	  # connection state is ESTABLISHED or RELATED
+	  for ALLOCATED in ${INTERNET}; do
+	    ${IPTABLES} -A INPUT -s ${ALLOCATED} -m state \
+	                --state RELATED,ESTABLISHED -j ACCEPT
+	  done
+	
+	  # Send packets from ::/128, link-local and
+	  # global unicast addresses
+	  for IP in '::/128' 'fe80::/64' ${GLOBAL}; do
+	    ${IPTABLES} -A OUTPUT -s ${IP} -j ACCEPT
+	  done
+	
+	}
+	
+	stop () {
+	  echo "Cleaning `basename ${IPTABLES}` rules."
+	  ${IPTABLES} -P INPUT ACCEPT
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT ACCEPT
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD ACCEPT
+	  ${IPTABLES} -F FORWARD
+	}
+	
+	status () {
+	  ${IPTABLES} --list -v
+	}
+	
+	case "${1}" in
+	  start)
+	    start
+	    ;;
+	  stop)
+	    stop
+	    ;;
+	  try|test)
+	    start
+	    sleep 10
+	    stop
+	    ;;
+	  restart|reload|force-reload)
+	    stop
+	    sleep 2
+	    start
+	    ;;
+	  status)
+	    status
+	    ;;
+	  *)
+	    echo "Usage: ${0} {start|stop|restart|status|try}" >&2
+	    exit 1
+	    ;;
+	esac
+	
+	exit 0
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/var/log/apache2', '/run/lock', )
+	cmdup=('/etc/init.d/apache2 start', )
+	cmddown=('/etc/init.d/apache2 stop', )
+	}
+    }
+    interface-peer {eth0 n2}
+}
+
+node n1 {
+    type router
+    model router
+    network-config {
+	hostname n1Router
+	!
+	interface eth0
+	 ipv6 address 2001:db8:1dea::1/64
+	!
+	interface eth1
+	 ipv6 address 2001:db8::2/127
+	!
+    }
+    canvas c1
+    iconcoords {505.0 228.0}
+    labelcoords {507.0 262.0}
+    custom-config {
+	custom-config-id service:Firewall
+	custom-command Firewall
+	config {
+	files=('firewall.sh', )
+	cmdup=('chmod 755 firewall.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:Firewall:firewall.sh
+	custom-command firewall.sh
+	config {
+	#!/bin/bash
+	
+	PATH=/sbin:/bin:/usr/sbin:/usr/bin
+	
+	IPTABLES=`which ip6tables`
+	
+	GLOBAL='2001:db8:1dea::1/128 2001:db8::2/128'
+	LAN='2001:db8:1dea::/48 2001:db8::2/127'
+	
+	# IANA aggregated prefixes, according to bcp.nic.br
+	IANA_PREFIXES="2800::/12 2001::/32 2001::/16 2600::/12 2610::/23
+	               2620::/23 2003::/16 2a00::/12 2400::/12 2c00::/12
+	               2002::/16"
+	
+	start() {
+	  ${IPTABLES} -X
+	  ${IPTABLES} -P INPUT DROP
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT DROP
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD DROP
+	  ${IPTABLES} -F FORWARD
+	
+	  for CHAIN in INPUT OUTPUT FORWARD; do
+	    # Disable Routing Header Type 0 [RFC5095]
+	    ${IPTABLES} -A ${CHAIN} -m rt --rt-type 0 -j DROP
+	    # Disable transit for some prefixes
+	    # 6bone         [RFC5156] : 3ffe::/16
+	    # BMWG          [RFC5180] : 2001:2::/48
+	    # ORCHID        [RFC4843] : 2001:10::/28
+	    # Documentation [RFC3849] : 2001:db8::/32
+	    # in real life you need to add doc prefix below
+	    for TARGET in '-s' '-d'; do
+	      for BLOCKED in '3ffe::/16' '2001:2::/48' '2001:10::/28'; do
+	        ${IPTABLES} -A ${CHAIN} ${TARGET} ${BLOCKED} -j DROP
+	      done
+	    done
+	  done
+	
+	  # Accept All Nodes link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1 -j ACCEPT
+	
+	  # Accept All Routers link-local scope
+	  # multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::2 -j ACCEPT
+	
+	  # Accept Solicited Node link-local scope
+	  # multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1:ff00:0000/104 -j ACCEPT
+	
+	  # Accept local scope ICMPv6 packets from
+	  # link-local prefix [RFC4890]
+	  for IP in 'fe80::/64'; do
+	    # Destination Unreachable [All codes] (Type 1)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                destination-unreachable -d ${IP} -j ACCEPT
+	    # Packet Too Big (Type 2)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                packet-too-big -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 0] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                ttl-zero-during-transit -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 1] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                ttl-zero-during-reassembly -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 0] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                bad-header -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 1] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                unknown-header-type -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 2] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                unknown-option -d ${IP} -j ACCEPT
+	
+	    # Echo Request (Type 128)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                echo-request -d ${IP} -j ACCEPT
+	    # Echo Response (Type 129)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                echo-reply -d ${IP} -j ACCEPT
+	
+	    # Router Solicitation (Type 133)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 \
+	                -d ${IP} -j ACCEPT
+	    # Router Advertisement (Type 134)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 \
+	                -d ${IP} -j ACCEPT
+	    # Neighbor Solicitation (Type 135)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 \
+	                -d ${IP} -j ACCEPT
+	    # Neighbor Advertisement (Type 136)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 \
+	                -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Solicitation (Type 141)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 \
+	                -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Advertisement (Type 142)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 \
+	                -d ${IP} -j ACCEPT
+	
+	    # Listener Query (Type 130)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 \
+	                -d ${IP} -j ACCEPT
+	    # Listener Report (Type 131)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 \
+	                -d ${IP} -j ACCEPT
+	    # Listener Done (Type 132)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 \
+	                -d ${IP} -j ACCEPT
+	    # Listener Report v2 (Type 143)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 \
+	                -d ${IP} -j ACCEPT
+	
+	    # Certification Path Solicitation (Type 148)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 \
+	                -d ${IP} -j ACCEPT
+	    # Certification Path Advertisement (Type 149)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 \
+	                -d ${IP} -j ACCEPT
+	
+	    # Multicast Router Advertisement (Type 151)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 \
+	                -d ${IP} -j ACCEPT
+	    # Multicast Router Solicitation (Type 152)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 \
+	                -d ${IP} -j ACCEPT
+	    # Multicast Router Termination (Type 153)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 \
+	                -d ${IP} -j ACCEPT
+	  done
+	
+	  for IP in ${GLOBAL}; do
+	    for ALLOCATED in ${IANA_PREFIXES}; do
+	      # Accept routable ICMPv6 packets from
+	      # IANA allocated prefixes [RFC4890]
+	      # Destination Unreachable [All codes] (Type 1)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  destination-unreachable -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Packet Too Big (Type 2)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  packet-too-big -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 0] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  ttl-zero-during-transit -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 1] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  ttl-zero-during-reassembly -s ${ALLOCATED} \
+	                  -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 0] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  bad-header -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 1] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  unknown-header-type -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 2] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  unknown-option -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Echo Request (Type 128)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  echo-request -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Echo Response (Type 129)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type \
+	                  echo-reply -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Router Solicitation (Type 133)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 \
+	                  -d ${IP} -j ACCEPT
+	      # Router Advertisement (Type 134)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 \
+	                  -d ${IP} -j ACCEPT
+	      # Neighbor Solicitation (Type 135)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 \
+	                  -d ${IP} -j ACCEPT
+	      # Neighbor Advertisement (Type 136)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 \
+	                  -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Solicitation (Type 141)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 \
+	                  -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Advertisement (Type 142)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Listener Query (Type 130)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 \
+	                  -d ${IP} -j ACCEPT
+	      # Listener Report (Type 131)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 \
+	                  -d ${IP} -j ACCEPT
+	      # Listener Done (Type 132)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 \
+	                  -d ${IP} -j ACCEPT
+	      # Listener Report v2 (Type 143)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Certification Path Solicitation (Type 148)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 \
+	                  -d ${IP} -j ACCEPT
+	      # Certification Path Advertisement (Type 149)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # Multicast Router Advertisement (Type 151)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 \
+	                  -d ${IP} -j ACCEPT
+	      # Multicast Router Solicitation (Type 152)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 \
+	                  -d ${IP} -j ACCEPT
+	      # Multicast Router Termination (Type 153)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 \
+	                  -d ${IP} -j ACCEPT
+	
+	      # traceroute
+	      ${IPTABLES} -A INPUT -p udp -m udp -s ${ALLOCATED} \
+	                  -d ${IP} --dport 33434:33523 -m state \
+	                  --state NEW -j REJECT --reject-with \
+	                  icmp6-port-unreachable
+	    done
+	  done
+	
+	  # Accept incoming packets from IANA allocated prefixes and
+	  # connection state is ESTABLISHED or RELATED
+	  for ALLOCATED in ${IANA_PREFIXES}; do
+	    ${IPTABLES} -A INPUT -s ${ALLOCATED} -m state \
+	                --state RELATED,ESTABLISHED -j ACCEPT
+	  done
+	
+	  # Send packets from ::/128, link-local and
+	  # global unicast addresses
+	  for IP in '::/128' 'fe80::/64' ${GLOBAL}; do
+	    ${IPTABLES} -A OUTPUT -s ${IP} -j ACCEPT
+	  done
+	
+	  # Accepted ICMPv6 packets for forwarding [RFC4890]
+	  for SOURCE in ${LAN} ${IANA_PREFIXES}; do
+	    # Echo Request (Type 128)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type echo-request \
+	                -s ${SOURCE} -j ACCEPT
+	    # Echo Response (Type 129)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type echo-reply \
+	                -s ${SOURCE} -j ACCEPT
+	
+	    # Destination Unreachable [All codes] (Type 1)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                destination-unreachable -s ${SOURCE} -j ACCEPT
+	    # Packet Too Big (Type 2)
+	    ## Modify the line below -- 1 of 1 ##
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                packet-too-big -s ${SOURCE} -j DROP
+	    # Time Exceeded [Code 0] (Type 3)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                ttl-zero-during-transit -s ${SOURCE} -j ACCEPT
+	    # Time Exceeded [Code 1] (Type 3)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                ttl-zero-during-reassembly -s ${SOURCE} -j ACCEPT
+	    # Parameter Problem [Code 0] (Type 4)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                bad-header -s ${SOURCE} -j ACCEPT
+	    # Parameter Problem [Code 1] (Type 4)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                unknown-header-type -s ${SOURCE} -j ACCEPT
+	    # Parameter Problem [Code 2] (Type 4)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type \
+	                unknown-option -s ${SOURCE} -j ACCEPT
+	  done
+	
+	  # Forward packets which source address belongs to
+	  # internal prefix incoming through eth0 interface
+	  for INTERNAL in ${LAN}; do
+	    ${IPTABLES} -A FORWARD -s ${INTERNAL} -i eth0 -j ACCEPT
+	  done
+	  # Forward packets which source address belongs to
+	  # IANA allocated prefixes incoming through eth1 interface and
+	  # connection state is ESTABLISHED or RELATED
+	  for ALLOCATED in ${IANA_PREFIXES}; do
+	    ${IPTABLES} -A FORWARD -s ${ALLOCATED} -m state \
+	                --state RELATED,ESTABLISHED -i eth1 -j ACCEPT
+	  done
+	
+	  # Allow external nodes to traceroute into LAN
+	  for INTERNAL in ${LAN}; do
+	      # traceroute
+	      ${IPTABLES} -A FORWARD -p udp -m udp -d ${INTERNAL} \
+	                  --dport 33434:33523 -j ACCEPT
+	  done
+	
+	}
+	
+	stop () {
+	  echo "Cleaning `basename ${IPTABLES}` rules."
+	  ${IPTABLES} -P INPUT ACCEPT
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT ACCEPT
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD ACCEPT
+	  ${IPTABLES} -F FORWARD
+	}
+	
+	status () {
+	  ${IPTABLES} --list -v
+	}
+	
+	case "${1}" in
+	  start)
+	    start
+	    ;;
+	  stop)
+	    stop
+	    ;;
+	  try|test)
+	    start
+	    sleep 10
+	    stop
+	    ;;
+	  restart|reload|force-reload)
+	    stop
+	    sleep 2
+	    start
+	    ;;
+	  status)
+	    status
+	    ;;
+	  *)
+	    echo "Usage: ${0} {start|stop|restart|status|try}" >&2
+	    exit 1
+	    ;;
+	esac
+	
+	exit 0
+	}
+    }
+    custom-config {
+	custom-config-id service:StaticRoute
+	custom-command StaticRoute
+	config {
+	files=('staticroute.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:StaticRoute:staticroute.sh
+	custom-command staticroute.sh
+	config {
+	#!/bin/sh
+	ip route add 2001:db8:c0de::/48 via 2001:db8::3
+	ip route add 2001:db8:1dea:cafe::/64 via 2001:db8:1dea::2
+	
+	}
+    }
+    services {IPForward StaticRoute Firewall}
+    interface-peer {eth1 n6}
+    interface-peer {eth0 n2}
+}
+
+node n6 {
+    type router
+    model router
+    network-config {
+	hostname n6Router
+	!
+	interface eth1
+	 ipv6 address 2001:db8:c0de::1/64
+	!
+	interface eth0
+	 ipv6 address 2001:db8::3/127
+	!
+    }
+    canvas c1
+    iconcoords {504.0 108.0}
+    labelcoords {517.0 89.0}
+    interface-peer {eth0 n1}
+    interface-peer {eth1 n7}
+    custom-config {
+	custom-config-id service:StaticRoute
+	custom-command StaticRoute
+	config {
+	files=('staticroute.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:StaticRoute:staticroute.sh
+	custom-command staticroute.sh
+	config {
+	#!/bin/sh
+	
+	ip route add 2001:db8:1dea::/48 via 2001:db8::2
+	
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	
+	
+	50
+	('ip link set eth1 mtu 1400', )
+	
+	
+	Customize this service to do anything upon startup.
+	}
+    }
+    services {IPForward StaticRoute UserDefined}
+}
+
+node n7 {
+    type router
+    model PC
+    network-config {
+	hostname n7Client
+	!
+	interface eth0
+	 ipv6 address 2001:db8:c0de::42/64
+	!
+    }
+    canvas c1
+    iconcoords {107.0 107.0}
+    labelcoords {105.0 83.0}
+    interface-peer {eth0 n6}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/root', )
+	files=('/root/.bashrc', '/root/.wgetrc', )
+	cmdup=('ip link set eth0 mtu 1400', 'mkdir -p /root/.ssh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/root/.wgetrc
+	custom-command /root/.wgetrc
+	config {
+	timeout = 5
+	tries = 1
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/root/.bashrc
+	custom-command /root/.bashrc
+	config {
+	[ -z "$PS1" ] && return
+	HISTCONTROL=ignoredups:ignorespace
+	shopt -s histappend
+	HISTSIZE=1000
+	HISTFILESIZE=2000
+	shopt -s checkwinsize
+	[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+	if [ -z "$debian_chroot" ] && [ -r /etc/debian_chroot ]; then
+	    debian_chroot=$(cat /etc/debian_chroot)
+	fi
+	case "$TERM" in
+	    xterm-color) color_prompt=yes;;
+	esac
+	if [ -n "$force_color_prompt" ]; then
+	    if [ -x /usr/bin/tput ] && tput setaf 1 >&/dev/null; then
+		color_prompt=yes
+	    else
+		color_prompt=
+	    fi
+	fi
+	if [ "$color_prompt" = yes ]; then
+	    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+	else
+	    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+	fi
+	unset color_prompt force_color_prompt
+	case "$TERM" in
+	xterm*|rxvt*|linux)
+	    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\h\a\]$PS1"
+	    ;;
+	*)
+	    ;;
+	esac
+	if [ -x /usr/bin/dircolors ]; then
+	    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+	    alias ls='ls --color=auto'
+	    alias grep='grep --color=auto'
+	    alias fgrep='fgrep --color=auto'
+	    alias egrep='egrep --color=auto'
+	fi
+	alias ll='ls -alF'
+	alias la='ls -A'
+	alias l='ls -CF'
+	if [ -f ~/.bash_aliases ]; then
+	    . ~/.bash_aliases
+	fi
+	
+	}
+    }
+    services {DefaultRoute UserDefined}
+}
+
+node n2 {
+    type lanswitch
+    network-config {
+	hostname n2Switch
+	!
+    }
+    canvas c1
+    iconcoords {298.0 228.0}
+    labelcoords {298.0 213.0}
+    interface-peer {e0 n4}
+    interface-peer {e1 n1}
+    interface-peer {e2 n3}
+}
+
+node n5 {
+    type router
+    model PC
+    network-config {
+	hostname n5Client
+	!
+	interface eth0
+	!
+    }
+    canvas c1
+    iconcoords {64.0 325.0}
+    labelcoords {64.0 357.0}
+    interface-peer {eth0 n3}
+    services {Firewall}
+    custom-config {
+	custom-config-id service:Firewall
+	custom-command Firewall
+	config {
+	files=('firewall.sh', )
+	cmdup=('chmod 755 firewall.sh', 'sh firewall.sh start', )
+	cmddown=('sh firewall.sh stop', )
+	}
+    }
+    custom-config {
+	custom-config-id service:Firewall:firewall.sh
+	custom-command firewall.sh
+	config {
+	#!/bin/bash
+	
+	PATH=/sbin:/bin:/usr/sbin:/usr/bin
+	
+	IPTABLES=`which ip6tables`
+	
+	GLOBAL='2001:db8:1dea:cafe::/64'
+	
+	INTERNET='2000::/3'
+	
+	start() {
+	  ${IPTABLES} -X
+	  ${IPTABLES} -P INPUT DROP
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT DROP
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD DROP
+	  ${IPTABLES} -F FORWARD
+	
+	  for CHAIN in INPUT OUTPUT FORWARD; do
+	    # Disable Routing Header Type 0 [RFC5095]
+	    ${IPTABLES} -A ${CHAIN} -m rt --rt-type 0 -j DROP
+	    # Disable transit for some prefixes
+	    # 6bone         [RFC5156] : 3ffe::/16
+	    # BMWG          [RFC5180] : 2001:2::/48
+	    # ORCHID        [RFC4843] : 2001:10::/28
+	    # Documentation [RFC3849] : 2001:db8::/32
+	    #                           in real life you need to add doc prefix below
+	    for TARGET in '-s' '-d'; do
+	      for BLOCKED in '3ffe::/16' '2001:2::/48' '2001:10::/28'; do
+	        ${IPTABLES} -A ${CHAIN} ${TARGET} ${BLOCKED} -j DROP
+	      done
+	    done
+	  done
+	
+	  # Accept All Nodes link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1 -j ACCEPT
+	
+	  # Accept Solicited Node link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1:ff00:0000/104 -j ACCEPT
+	
+	  # Accept local scope ICMPv6 packets from link-local prefix [RFC4890]
+	  for IP in 'fe80::/64'; do
+	    # Destination Unreachable [All codes] (Type 1)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type destination-unreachable \
+	                -d ${IP} -j ACCEPT
+	    # Packet Too Big (Type 2)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type packet-too-big \
+	                -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 0] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-transit \
+	                -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 1] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-reassembly \
+	                -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 0] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type bad-header \
+	                -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 1] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-header-type \
+	                -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 2] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-option \
+	                -d ${IP} -j ACCEPT
+	
+	    # Echo Request (Type 128)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-request \
+	                -d ${IP} -j ACCEPT
+	    # Echo Response (Type 129)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-reply \
+	                -d ${IP} -j ACCEPT
+	
+	    # Router Solicitation (Type 133)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 -d ${IP} -j ACCEPT
+	    # Router Advertisement (Type 134)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 -d ${IP} -j ACCEPT
+	    # Neighbor Solicitation (Type 135)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 -d ${IP} -j ACCEPT
+	    # Neighbor Advertisement (Type 136)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Solicitation (Type 141)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Advertisement (Type 142)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 -d ${IP} -j ACCEPT
+	
+	    # Listener Query (Type 130)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 -d ${IP} -j ACCEPT
+	    # Listener Report (Type 131)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 -d ${IP} -j ACCEPT
+	    # Listener Done (Type 132)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 -d ${IP} -j ACCEPT
+	    # Listener Report v2 (Type 143)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 -d ${IP} -j ACCEPT
+	
+	    # Certification Path Solicitation (Type 148)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 -d ${IP} -j ACCEPT
+	    # Certification Path Advertisement (Type 149)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 -d ${IP} -j ACCEPT
+	
+	    # Multicast Router Advertisement (Type 151)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 -d ${IP} -j ACCEPT
+	    # Multicast Router Solicitation (Type 152)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 -d ${IP} -j ACCEPT
+	    # Multicast Router Termination (Type 153)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 -d ${IP} -j ACCEPT
+	  done
+	
+	  for IP in ${GLOBAL}; do
+	    for ALLOCATED in ${INTERNET}; do
+	      # Accept routable ICMPv6 packets from allocated prefixes [RFC4890]
+	      # Destination Unreachable [All codes] (Type 1)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type destination-unreachable \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Packet Too Big (Type 2)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type packet-too-big \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 0] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-transit \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 1] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-reassembly \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 0] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type bad-header \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 1] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-header-type \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 2] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-option \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Echo Request (Type 128)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-request \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Echo Response (Type 129)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-reply \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Router Solicitation (Type 133)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 -d ${IP} -j ACCEPT
+	      # Router Advertisement (Type 134)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 -d ${IP} -j ACCEPT
+	      # Neighbor Solicitation (Type 135)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 -d ${IP} -j ACCEPT
+	      # Neighbor Advertisement (Type 136)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Solicitation (Type 141)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Advertisement (Type 142)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 -d ${IP} -j ACCEPT
+	
+	      # Listener Query (Type 130)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 -d ${IP} -j ACCEPT
+	      # Listener Report (Type 131)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 -d ${IP} -j ACCEPT
+	      # Listener Done (Type 132)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 -d ${IP} -j ACCEPT
+	      # Listener Report v2 (Type 143)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 -d ${IP} -j ACCEPT
+	
+	      # Certification Path Solicitation (Type 148)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 -d ${IP} -j ACCEPT
+	      # Certification Path Advertisement (Type 149)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 -d ${IP} -j ACCEPT
+	
+	      # Multicast Router Advertisement (Type 151)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 -d ${IP} -j ACCEPT
+	      # Multicast Router Solicitation (Type 152)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 -d ${IP} -j ACCEPT
+	      # Multicast Router Termination (Type 153)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 -d ${IP} -j ACCEPT
+	
+	      # traceroute
+	      ${IPTABLES} -A INPUT -p udp -m udp -s ${ALLOCATED} -d ${IP} \
+	                  --dport 33434:33523 -m state --state NEW -j REJECT \
+	                  --reject-with icmp6-port-unreachable
+	      # ssh
+	      ${IPTABLES} -A INPUT -p tcp -s ${ALLOCATED} -d ${IP} --dport 22 \
+	                -j ACCEPT
+	    done
+	  done
+	
+	  # Accept incoming packets from allocated prefixes and
+	  # connection state is ESTABLISHED or RELATED
+	  for ALLOCATED in ${INTERNET}; do
+	    ${IPTABLES} -A INPUT -s ${ALLOCATED} -m state \
+	                --state RELATED,ESTABLISHED -j ACCEPT
+	  done
+	
+	  # Send packets from ::/128, link-local and global unicast addresses
+	  for IP in '::/128' 'fe80::/64' ${GLOBAL}; do
+	    ${IPTABLES} -A OUTPUT -s ${IP} -j ACCEPT
+	  done
+	
+	}
+	
+	stop () {
+	  echo "Cleaning `basename ${IPTABLES}` rules."
+	  ${IPTABLES} -P INPUT ACCEPT
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT ACCEPT
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD ACCEPT
+	  ${IPTABLES} -F FORWARD
+	}
+	
+	status () {
+	  ${IPTABLES} --list -v
+	}
+	
+	case "${1}" in
+	  start)
+	    start
+	    ;;
+	  stop)
+	    stop
+	    ;;
+	  try|test)
+	    start
+	    sleep 10
+	    stop
+	    ;;
+	  restart|reload|force-reload)
+	    stop
+	    sleep 2
+	    start
+	    ;;
+	  status)
+	    status
+	    ;;
+	  *)
+	    echo "Usage: ${0} {start|stop|restart|status|try}" >&2
+	    exit 1
+	    ;;
+	esac
+	
+	exit 0
+	}
+    }
+}
+
+node n3 {
+    type router
+    model router
+    network-config {
+	hostname n3Router
+	!
+	interface eth1
+	 ipv6 address 2001:db8:1dea:cafe::1/64
+	!
+	interface eth0
+	 ipv6 address 2001:db8:1dea::2/64
+	!
+    }
+    canvas c1
+    iconcoords {299.0 325.0}
+    labelcoords {299.0 357.0}
+    interface-peer {eth0 n2}
+    interface-peer {eth1 n5}
+    custom-config {
+	custom-config-id service:Firewall
+	custom-command Firewall
+	config {
+	files=('firewall.sh', )
+	cmdup=('chmod 755 firewall.sh', 'sh firewall.sh start', )
+	cmddown=('sh firewall.sh stop', )
+	}
+    }
+    custom-config {
+	custom-config-id service:Firewall:firewall.sh
+	custom-command firewall.sh
+	config {
+	#!/bin/bash
+	
+	PATH=/sbin:/bin:/usr/sbin:/usr/bin
+	
+	IPTABLES=`which ip6tables`
+	
+	GLOBAL='2001:db8:1dea::2/128 2001:db8:1dea:cafe:1/128'
+	LAN='2001:db8:1dea::/48'
+	
+	# Global unicast prefix
+	INTERNET='2000::/3'
+	
+	start() {
+	  ${IPTABLES} -X
+	  ${IPTABLES} -P INPUT DROP
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT DROP
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD DROP
+	  ${IPTABLES} -F FORWARD
+	
+	  for CHAIN in INPUT OUTPUT FORWARD; do
+	    # Disable Routing Header Type 0 [RFC5095]
+	    ${IPTABLES} -A ${CHAIN} -m rt --rt-type 0 -j DROP
+	    # Disable transit for some prefixes
+	    # 6bone         [RFC5156] : 3ffe::/16
+	    # BMWG          [RFC5180] : 2001:2::/48
+	    # ORCHID        [RFC4843] : 2001:10::/28
+	    # Documentation [RFC3849] : 2001:db8::/32
+	    #                           in real life you need to add doc prefix below
+	    for TARGET in '-s' '-d'; do
+	      for BLOCKED in '3ffe::/16' '2001:2::/48' '2001:10::/28'; do
+	        ${IPTABLES} -A ${CHAIN} ${TARGET} ${BLOCKED} -j DROP
+	      done
+	    done
+	  done
+	
+	  # Accept All Nodes link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1 -j ACCEPT
+	
+	  # Accept All Routers link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::2 -j ACCEPT
+	
+	  # Accept Solicited Node link-local scope multicast prefix [RFC4291]
+	  ${IPTABLES} -A INPUT -d ff02::1:ff00:0000/104 -j ACCEPT
+	
+	  # Accept local scope ICMPv6 packets from link-local prefix [RFC4890]
+	  for IP in 'fe80::/64'; do
+	    # Destination Unreachable [All codes] (Type 1)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type destination-unreachable \
+	                -d ${IP} -j ACCEPT
+	    # Packet Too Big (Type 2)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type packet-too-big \
+	                -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 0] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-transit \
+	                -d ${IP} -j ACCEPT
+	    # Time Exceeded [Code 1] (Type 3)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-reassembly \
+	                -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 0] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type bad-header \
+	                -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 1] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-header-type \
+	                -d ${IP} -j ACCEPT
+	    # Parameter Problem [Code 2] (Type 4)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-option \
+	                -d ${IP} -j ACCEPT
+	
+	    # Echo Request (Type 128)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-request \
+	                -d ${IP} -j ACCEPT
+	    # Echo Response (Type 129)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-reply \
+	                -d ${IP} -j ACCEPT
+	
+	    # Router Solicitation (Type 133)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 -d ${IP} -j ACCEPT
+	    # Router Advertisement (Type 134)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 -d ${IP} -j ACCEPT
+	    # Neighbor Solicitation (Type 135)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 -d ${IP} -j ACCEPT
+	    # Neighbor Advertisement (Type 136)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Solicitation (Type 141)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 -d ${IP} -j ACCEPT
+	    # Inverse Neighbor Discovery Advertisement (Type 142)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 -d ${IP} -j ACCEPT
+	
+	    # Listener Query (Type 130)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 -d ${IP} -j ACCEPT
+	    # Listener Report (Type 131)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 -d ${IP} -j ACCEPT
+	    # Listener Done (Type 132)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 -d ${IP} -j ACCEPT
+	    # Listener Report v2 (Type 143)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 -d ${IP} -j ACCEPT
+	
+	    # Certification Path Solicitation (Type 148)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 -d ${IP} -j ACCEPT
+	    # Certification Path Advertisement (Type 149)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 -d ${IP} -j ACCEPT
+	
+	    # Multicast Router Advertisement (Type 151)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 -d ${IP} -j ACCEPT
+	    # Multicast Router Solicitation (Type 152)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 -d ${IP} -j ACCEPT
+	    # Multicast Router Termination (Type 153)
+	    ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 -d ${IP} -j ACCEPT
+	  done
+	
+	  for IP in ${GLOBAL}; do
+	    for ALLOCATED in ${INTERNET}; do
+	      # Accept routable ICMPv6 packets from global unicast prefix [RFC4890]
+	      # Destination Unreachable [All codes] (Type 1)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type destination-unreachable \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Packet Too Big (Type 2)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type packet-too-big \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 0] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-transit \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Time Exceeded [Code 1] (Type 3)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type ttl-zero-during-reassembly \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 0] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type bad-header \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 1] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-header-type \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Parameter Problem [Code 2] (Type 4)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type unknown-option \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Echo Request (Type 128)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-request \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	      # Echo Response (Type 129)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type echo-reply \
+	                  -s ${ALLOCATED} -d ${IP} -j ACCEPT
+	
+	      # Router Solicitation (Type 133)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 133 -d ${IP} -j ACCEPT
+	      # Router Advertisement (Type 134)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 134 -d ${IP} -j ACCEPT
+	      # Neighbor Solicitation (Type 135)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 135 -d ${IP} -j ACCEPT
+	      # Neighbor Advertisement (Type 136)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 136 -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Solicitation (Type 141)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 141 -d ${IP} -j ACCEPT
+	      # Inverse Neighbor Discovery Advertisement (Type 142)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 142 -d ${IP} -j ACCEPT
+	
+	      # Listener Query (Type 130)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 130 -d ${IP} -j ACCEPT
+	      # Listener Report (Type 131)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 131 -d ${IP} -j ACCEPT
+	      # Listener Done (Type 132)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 132 -d ${IP} -j ACCEPT
+	      # Listener Report v2 (Type 143)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 143 -d ${IP} -j ACCEPT
+	
+	      # Certification Path Solicitation (Type 148)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 148 -d ${IP} -j ACCEPT
+	      # Certification Path Advertisement (Type 149)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 149 -d ${IP} -j ACCEPT
+	
+	      # Multicast Router Advertisement (Type 151)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 151 -d ${IP} -j ACCEPT
+	      # Multicast Router Solicitation (Type 152)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 152 -d ${IP} -j ACCEPT
+	      # Multicast Router Termination (Type 153)
+	      ${IPTABLES} -A INPUT -p icmpv6 --icmpv6-type 153 -d ${IP} -j ACCEPT
+	
+	      # traceroute
+	      ${IPTABLES} -A INPUT -p udp -m udp -s ${ALLOCATED} -d ${IP} \
+	                  --dport 33434:33523 -m state --state NEW -j REJECT \
+	                  --reject-with icmp6-port-unreachable
+	    done
+	  done
+	
+	  # Accept incoming packets from global unicast prefix and
+	  # connection state is ESTABLISHED or RELATED
+	  for ALLOCATED in ${INTERNET}; do
+	    ${IPTABLES} -A INPUT -s ${ALLOCATED} -m state \
+	                --state RELATED,ESTABLISHED -j ACCEPT
+	  done
+	
+	  # Send packets from ::/128, link-local and global unicast addresses
+	  for IP in '::/128' 'fe80::/64' ${GLOBAL}; do
+	    ${IPTABLES} -A OUTPUT -s ${IP} -j ACCEPT
+	  done
+	
+	  # Accepted ICMPv6 packets for forwarding [RFC4890]
+	  for SOURCE in ${LAN} ${INTERNET}; do
+	    # Echo Request (Type 128)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type echo-request \
+	                -s ${SOURCE} -j ACCEPT
+	    # Echo Response (Type 129)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type echo-reply \
+	                -s ${SOURCE} -j ACCEPT
+	
+	    # Destination Unreachable [All codes] (Type 1)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type destination-unreachable \
+	                -s ${SOURCE} -j ACCEPT
+	    # Packet Too Big (Type 2)
+	    ## Modify the line below -- 1 of 1 ##
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type packet-too-big \
+	                -s ${SOURCE} -j DROP
+	    # Time Exceeded [Code 0] (Type 3)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type ttl-zero-during-transit \
+	                -s ${SOURCE} -j ACCEPT
+	    # Time Exceeded [Code 1] (Type 3)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type ttl-zero-during-reassembly \
+	                -s ${SOURCE} -j ACCEPT
+	    # Parameter Problem [Code 0] (Type 4)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type bad-header \
+	                -s ${SOURCE} -j ACCEPT
+	    # Parameter Problem [Code 1] (Type 4)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type unknown-header-type \
+	                -s ${SOURCE} -j ACCEPT
+	    # Parameter Problem [Code 2] (Type 4)
+	    ${IPTABLES} -A FORWARD -p icmpv6 --icmpv6-type unknown-option \
+	                -s ${SOURCE} -j ACCEPT
+	  done
+	
+	  # Forward packets which source address belongs to internal prefix
+	  # incoming through eth1 interface
+	  ${IPTABLES} -A FORWARD -s ${LAN} -i eth1 -j ACCEPT
+	  # Forward packets which source address belongs to global unicast prefix
+	  # incoming through eth0 interface and
+	  # connection state is ESTABLISHED or RELATED
+	  for ALLOCATED in ${INTERNET}; do
+	    ${IPTABLES} -A FORWARD -s ${ALLOCATED} -m state \
+	                --state RELATED,ESTABLISHED -i eth0 -j ACCEPT
+	  done
+	
+	}
+	
+	stop () {
+	  echo "Cleaning `basename ${IPTABLES}` rules."
+	  ${IPTABLES} -P INPUT ACCEPT
+	  ${IPTABLES} -F INPUT
+	  ${IPTABLES} -P OUTPUT ACCEPT
+	  ${IPTABLES} -F OUTPUT
+	  ${IPTABLES} -P FORWARD ACCEPT
+	  ${IPTABLES} -F FORWARD
+	}
+	
+	status () {
+	  ${IPTABLES} --list -v
+	}
+	
+	case "${1}" in
+	  start)
+	    start
+	    ;;
+	  stop)
+	    stop
+	    ;;
+	  try|test)
+	    start
+	    sleep 10
+	    stop
+	    ;;
+	  restart|reload|force-reload)
+	    stop
+	    sleep 2
+	    start
+	    ;;
+	  status)
+	    status
+	    ;;
+	  *)
+	    echo "Usage: ${0} {start|stop|restart|status|try}" >&2
+	    exit 1
+	    ;;
+	esac
+	
+	exit 0
+	}
+    }
+    custom-config {
+	custom-config-id service:DefaultRoute
+	custom-command DefaultRoute
+	config {
+	files=('defaultroute.sh', )
+	}
+    }
+    custom-config {
+	custom-config-id service:DefaultRoute:defaultroute.sh
+	custom-command defaultroute.sh
+	config {
+	#!/bin/sh
+	# auto-generated by DefaultRoute service (utility.py)
+	ip route add default via 2001:db8:1dea::1 dev eth0
+	
+	}
+    }
+    custom-config {
+	custom-config-id service:radvd
+	custom-command radvd
+	config {
+	files=('/etc/radvd/radvd.conf', )
+	}
+    }
+    custom-config {
+	custom-config-id service:radvd:/etc/radvd/radvd.conf
+	custom-command /etc/radvd/radvd.conf
+	config {
+	# auto-generated by RADVD service (utility.py)
+	interface eth1
+	{
+	        AdvSendAdvert on;
+	        MinRtrAdvInterval 3;
+	        MaxRtrAdvInterval 10;
+	        AdvDefaultPreference low;
+	        AdvHomeAgentFlag off;
+	        prefix 2001:db8:1dea:cafe::/64
+	        {
+	                AdvOnLink on;
+	                AdvAutonomous on;
+	                AdvRouterAddr on;
+	        };
+	};
+	
+	}
+    }
+    services {IPForward DefaultRoute radvd Firewall}
+}
+
+link l3 {
+    nodes {n1 n6}
+    bandwidth 0
+}
+
+link l4 {
+    nodes {n7 n6}
+    bandwidth 0
+}
+
+link l1 {
+    nodes {n4 n2}
+    bandwidth 0
+}
+
+link l2 {
+    nodes {n2 n1}
+    bandwidth 0
+}
+
+link l5 {
+    nodes {n2 n3}
+    bandwidth 0
+}
+
+link l6 {
+    nodes {n5 n3}
+    bandwidth 0
+}
+
+annotation a1 {
+    iconcoords {16.0 35.0 575.0 375.0}
+    type rectangle
+    label {IPv6 Internet}
+    labelcolor black
+    fontfamily {Arial}
+    fontsize {12}
+    color #c0c0ff
+    width 0
+    border black
+    rad 25
+    canvas c1
+}
+
+annotation a2 {
+    iconcoords {27.0 158.0 563.0 363.0}
+    type rectangle
+    label {LAN}
+    labelcolor black
+    fontfamily {Arial}
+    fontsize {12}
+    color #19ffff
+    width 0
+    border black
+    rad 25
+    canvas c1
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names yes
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid no
+    traffic_start 0
+}
+
+option session {
+}
+

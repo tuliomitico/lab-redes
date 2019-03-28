@@ -1,0 +1,66 @@
+node n1 {
+    type router
+    model host
+    network-config {
+	hostname n1Host
+	!
+	interface eth0
+	 ipv6 address 2001:db8::10/64
+	!
+    }
+    canvas c1
+    iconcoords {236.0 271.0}
+    labelcoords {236.0 303.0}
+    interface-peer {eth0 n2}
+    services {DefaultRoute UserDefined}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/var/log/apache2', '/run/lock', )
+	}
+    }
+}
+
+node n2 {
+    type router
+    model PC
+    network-config {
+	hostname n2Client
+	!
+	interface eth0
+	 ipv6 address 2001:db8::20/64
+	!
+    }
+    canvas c1
+    iconcoords {552.0 270.0}
+    labelcoords {552.0 302.0}
+    interface-peer {eth0 n1}
+    services {DefaultRoute}
+}
+
+link l1 {
+    nodes {n2 n1}
+    bandwidth 0
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names no
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid no
+    traffic_start 0
+}
+
+option session {
+}
+

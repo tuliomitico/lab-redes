@@ -1,0 +1,115 @@
+node n1 {
+    type router
+    model host
+    network-config {
+	hostname n1Host
+	!
+	interface eth0
+	 ipv6 address 2001:db8:cafe::10/64
+	!
+    }
+    canvas c1
+    iconcoords {297.0 125.0}
+    labelcoords {299.0 105.0}
+    interface-peer {eth0 n2}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/var/run/samba', '/var/log/samba', '/etc/samba', '/usr/local/share/samba', )
+	files=('/etc/samba/smb.conf', )
+	cmdup=('chmod 755 /var/run/samba', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/samba/smb.conf
+	custom-command /etc/samba/smb.conf
+	config {
+	[global]
+	workgroup = crew
+	netbios name = node
+	security = user
+	interfaces = 
+	hosts allow = 
+	load printers = no
+	log file = /var/log/samba.%m
+	max log size = 50
+	[data]
+	path = 
+	read only = yes
+	valid users = 
+	
+	}
+    }
+    services {UserDefined}
+}
+
+node n2 {
+    type router
+    model PC
+    network-config {
+	hostname n2Client
+	!
+	interface eth0
+	 ipv6 address 2001:db8:cafe::20/64
+	!
+    }
+    canvas c1
+    iconcoords {298.0 295.0}
+    labelcoords {298.0 327.0}
+    interface-peer {eth0 n1}
+    services {UserDefined}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	('/etc/samba', '/var/run/samba', )
+	
+	50
+	('chmod 0755 /var/run/samba', 'touch /etc/samba/smb.conf', 'mkdir /var/log/samba', )
+	
+	
+	Customize this service to do anything upon startup.
+	}
+    }
+}
+
+link l1 {
+    nodes {n1 n2}
+    bandwidth 0
+}
+
+annotation a1 {
+    iconcoords {146.0 51.0 457.0 362.0}
+    type rectangle
+    label {LAN}
+    labelcolor black
+    fontfamily {Arial}
+    fontsize {12}
+    color #19ffff
+    width 0
+    border black
+    rad 25
+    canvas c1
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names yes
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid no
+    traffic_start 0
+}
+
+option session {
+}
+

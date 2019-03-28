@@ -1,0 +1,150 @@
+node n1 {
+    type router
+    model host
+    network-config {
+	hostname n1Host
+	!
+	interface eth0
+	 ipv6 address 2001:db8::10/64
+	 ip address 192.0.2.10/24
+	!
+    }
+    canvas c1
+    iconcoords {236.0 271.0}
+    labelcoords {236.0 303.0}
+    interface-peer {eth0 n2}
+    services {DefaultRoute UserDefined}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/var/log/apache2', '/run/lock', '/etc/apache2/ports', '/etc/apache2/sites-available', )
+	files=('/etc/apache2/ports/ports.conf', '/etc/apache2/sites-available/default', )
+	cmdup=('/etc/init.d/apache2 start', )
+	cmddown=('/etc/init.d/apache2 stop', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/apache2/sites-available/default
+	custom-command /etc/apache2/sites-available/default
+	config {
+	<VirtualHost 192.0.2.10:80>
+		ServerAdmin webmaster@localhost
+	
+		DocumentRoot /var/www
+		<Directory />
+			Options FollowSymLinks
+			AllowOverride None
+		</Directory>
+		<Directory /var/www/>
+			Options Indexes FollowSymLinks MultiViews
+			AllowOverride None
+			Order allow,deny
+			allow from all
+		</Directory>
+	
+		ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/
+		<Directory "/usr/lib/cgi-bin">
+			AllowOverride None
+			Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+			Order allow,deny
+			Allow from all
+		</Directory>
+	
+		ErrorLog ${APACHE_LOG_DIR}/error.log
+	
+		# Possible values include: debug, info, notice, warn, error, crit,
+		# alert, emerg.
+		LogLevel warn
+	
+		CustomLog ${APACHE_LOG_DIR}/access.log combined
+	
+	    Alias /doc/ "/usr/share/doc/"
+	    <Directory "/usr/share/doc/">
+	        Options Indexes MultiViews FollowSymLinks
+	        AllowOverride None
+	        Order deny,allow
+	        Deny from all
+	        Allow from 127.0.0.0/255.0.0.0 ::1/128
+	    </Directory>
+	
+	</VirtualHost>
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/etc/apache2/ports/ports.conf
+	custom-command /etc/apache2/ports/ports.conf
+	config {
+	# If you just change the port or add more ports here, you will likely also
+	# have to change the VirtualHost statement in
+	# /etc/apache2/sites-enabled/000-default
+	# This is also true if you have upgraded from before 2.2.9-3 (i.e. from
+	# Debian etch). See /usr/share/doc/apache2.2-common/NEWS.Debian.gz and
+	# README.Debian.gz
+	
+	NameVirtualHost 192.0.2.10:80
+	Listen 192.0.2.10:80
+	
+	<IfModule mod_ssl.c>
+	    # If you add NameVirtualHost *:443 here, you will also have to change
+	    # the VirtualHost statement in /etc/apache2/sites-available/default-ssl
+	    # to <VirtualHost *:443>
+	    # Server Name Indication for SSL named virtual hosts is currently not
+	    # supported by MSIE on Windows XP.
+	    Listen 443
+	</IfModule>
+	
+	<IfModule mod_gnutls.c>
+	    Listen 443
+	</IfModule>
+	
+	
+	}
+    }
+}
+
+node n2 {
+    type router
+    model PC
+    network-config {
+	hostname n2Client
+	!
+	interface eth0
+	 ipv6 address 2001:db8::20/64
+	 ip address 192.0.2.20/24
+	!
+    }
+    canvas c1
+    iconcoords {552.0 270.0}
+    labelcoords {552.0 302.0}
+    interface-peer {eth0 n1}
+    services {DefaultRoute}
+}
+
+link l1 {
+    nodes {n2 n1}
+    bandwidth 0
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names no
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    ipsec_configs yes
+    exec_errors yes
+    show_api no
+    background_images no
+    annotations yes
+    grid no
+    traffic_start 0
+}
+
+option session {
+}
+

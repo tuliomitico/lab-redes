@@ -1,0 +1,175 @@
+node n1 {
+    type router
+    model host
+    network-config {
+	hostname n1Host
+	!
+	interface eth0
+	!
+    }
+    canvas c1
+    iconcoords {363.0 251.0}
+    labelcoords {363.0 283.0}
+    interface-peer {eth0 n4}
+    services {DefaultRoute}
+}
+
+node n2 {
+    type router
+    model host
+    network-config {
+	hostname n2Host
+	!
+	interface eth0
+	!
+    }
+    canvas c1
+    iconcoords {449.0 327.0}
+    labelcoords {449.0 359.0}
+    interface-peer {eth0 n4}
+    services {DefaultRoute UserDefined}
+    custom-config {
+	custom-config-id service:UserDefined
+	custom-command UserDefined
+	config {
+	dirs=('/var/local/lib/ndpmon', )
+	files=('/var/local/lib/ndpmon/neighbor_list.dtd', '/var/local/lib/ndpmon/neighbor_list.xml', '/var/local/lib/ndpmon/alerts.xml', )
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/var/local/lib/ndpmon/alerts.xml
+	custom-command /var/local/lib/ndpmon/alerts.xml
+	config {
+	<?xml version="1.0"?>
+	<?xml-stylesheet type="text/xsl" href="alerts.xsl"?>
+	<alerts>
+	</alerts>
+	
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/var/local/lib/ndpmon/neighbor_list.xml
+	custom-command /var/local/lib/ndpmon/neighbor_list.xml
+	config {
+	<?xml version="1.0" encoding="ISO-8859-1"?>
+	<?xml-stylesheet type="text/xsl" href="neighbor.xsl"?>
+	<!DOCTYPE neighbors SYSTEM "neighbor_list.dtd">
+	<neighbors>
+	</neighbors>
+	
+	}
+    }
+    custom-config {
+	custom-config-id service:UserDefined:/var/local/lib/ndpmon/neighbor_list.dtd
+	custom-command /var/local/lib/ndpmon/neighbor_list.dtd
+	config {
+	<!ELEMENT neighbors (probe*)>
+	<!ELEMENT probe (address*, neighbor*)>
+	<!ATTLIST probe
+	    mac CDATA #IMPLIED
+	    name CDATA #REQUIRED
+	>
+	
+	<!ELEMENT neighbor (mac, first_mac_seen, lla, lastseen, addresses, old_macs?)>
+	
+	<!ELEMENT mac (#PCDATA)>
+	<!ATTLIST mac vendor CDATA #IMPLIED>
+	<!ATTLIST mac last CDATA #IMPLIED>
+	<!ELEMENT first_mac_seen (#PCDATA)>
+	<!ELEMENT lla (#PCDATA)>
+	<!ELEMENT firstseen (#PCDATA)>
+	<!ELEMENT lastseen (#PCDATA)>
+	<!ATTLIST lastseen lastseenstr CDATA #IMPLIED>
+	
+	<!ELEMENT addresses (address*)>
+	<!ELEMENT address (#PCDATA)>
+	<!ATTLIST address firstseen CDATA #IMPLIED>
+	<!ATTLIST address firstseenstr CDATA #IMPLIED>
+	<!ATTLIST address lastseen CDATA #IMPLIED>
+	<!ATTLIST address lastseenstr CDATA #IMPLIED>
+	
+	<!ELEMENT old_macs (mac*)>
+	
+	}
+    }
+}
+
+node n3 {
+    type router
+    model host
+    network-config {
+	hostname n3Faker
+	!
+	interface eth0
+	!
+    }
+    canvas c1
+    iconcoords {543.0 249.0}
+    labelcoords {542.0 287.0}
+    interface-peer {eth0 n4}
+    services {DefaultRoute}
+}
+
+node n4 {
+    type lanswitch
+    network-config {
+	hostname n4Switch
+	!
+    }
+    canvas c1
+    iconcoords {450.0 250.0}
+    labelcoords {446.0 238.0}
+    interface-peer {e0 n1}
+    interface-peer {e1 n2}
+    interface-peer {e2 n3}
+}
+
+link l1 {
+    nodes {n1 n4}
+    bandwidth 0
+}
+
+link l2 {
+    nodes {n2 n4}
+    bandwidth 0
+}
+
+link l3 {
+    nodes {n3 n4}
+    bandwidth 0
+}
+
+annotation a1 {
+    iconcoords {310 181 585 385}
+    type rectangle
+    label {LAN}
+    labelcolor black
+    fontfamily {Arial}
+    fontsize {12}
+    color #19ffff
+    width 0
+    border black
+    rad 25
+    canvas c1
+}
+
+canvas c1 {
+    name {Canvas1}
+}
+
+option global {
+    interface_names no
+    ip_addresses yes
+    ipv6_addresses yes
+    node_labels yes
+    link_labels yes
+    show_api no
+    background_images no
+    annotations yes
+    grid no
+    traffic_start 0
+}
+
+option session {
+}
+
